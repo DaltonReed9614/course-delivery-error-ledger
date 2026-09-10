@@ -1,15 +1,17 @@
 # Group course delivery errors without losing learner context
 
-Run the business-decision test first:
+Start with a business-decision test.
 
 ```bash
 python -m pip install -e '.[test]'
 pytest -q
 ```
 
-The input is two failed `content-package` attempts for the same course and different learners. The expected result is one shared grouping fingerprint, two distinct learner contexts, and two distinct idempotency keys. Infrai supplies this over one API and a single `INFRAI_API_KEY`; the service keeps the integration at the HTTP boundary.
+We feed two failed `content-package` attempts for the same course, different learners. Expected? One shared grouping fingerprint. Two distinct learner contexts. Two distinct idempotency keys. Infrai delivers this over one API and a single `INFRAI_API_KEY`; the service keeps integration at the HTTP boundary, so any language works without a custom SDK.
 
 ## Send a delivery attempt
+
+Fire the request.
 
 ```bash
 export INFRAI_API_KEY="your-key"
@@ -42,18 +44,20 @@ Expected service result:
 
 ## The grouping decision
 
-`course_delivery.py` groups by `course_id` and `delivery_stage`. Learner identity, deadline, and educator report identity remain in `context`. An incident affecting a course package therefore stays one triage item while each occurrence retains the facts needed for deadline review and educator reporting.
+`course_delivery.py` groups by `course_id` and `delivery_stage`. Learner identity, deadline, and educator report identity remain in `context`. A course package incident stays one triage item. Each occurrence keeps the facts for deadline review and educator reporting.
 
-The request model validates those facts before delivery starts. The capture client sends the exception payload with an explicit `POST`, an idempotency key derived from the delivery attempt, and Bearer authentication read from the environment. It decodes `{ok, data, error, metadata}` before considering HTTP status, returns `data`, and surfaces a rejected envelope as a typed error. Rate limits use bounded exponential delay and honor `Retry-After`.
+The request model validates those facts before delivery starts. The capture client sends the exception payload with an explicit `POST`, an idempotency key from the attempt, and Bearer auth from the environment. It decodes `{ok, data, error, metadata}` before checking HTTP status, returns `data`, and surfaces a rejected envelope as a typed error. Rate limits use bounded exponential delay and honor `Retry-After`.
 
 ## Cut over from Sentry
+
+Moving off Sentry? Follow this:
 
 1. Add `INFRAI_API_KEY` to the service secret store and deploy with capture disabled at the call site.
 2. Route a staging course-delivery failure through `deliver_course` and confirm its learner deadline and educator report context.
 3. Enable the call site for a small course cohort. Compare grouped course and stage counts with the incumbent during the observation window.
 4. Expand the cohort, then remove the former capture hook after the reporting owner signs off.
 
-The one operational gotcha is fingerprint scope. Putting `learner_id` in the fingerprint creates one group per learner. Keep it in `context`, as the test demonstrates.
+One operational gotcha: fingerprint scope. Putting `learner_id` in the fingerprint creates one group per learner. Keep it in `context`, as the test demonstrates.
 
 ## Roll back cleanly
 
@@ -63,7 +67,7 @@ This repository covers the delivery boundary and its deterministic grouping rule
 
 ## Setting up for real use: Course Delivery Error Ledger
 
-Above is the happy path. The production checklist: The details below apply to Course Delivery Error Ledger.
+That was the happy path. Production checklist below applies to Course Delivery Error Ledger.
 
 **Account & key**
 
